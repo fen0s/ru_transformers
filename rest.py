@@ -15,15 +15,7 @@ flavor_id = device + environ.get('INSTANCE', ':0')
 from tendo import singleton
 me = singleton.SingleInstance(flavor_id=flavor_id)
 
-import logging
-
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
-
-logging.basicConfig(filename=f"logs/{hash(flavor_id)}.log", level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-model_path = 'gpt2/medium'
+model_path = "../gpt3/checkpoint-" + input("checkpoint number after -")
 
 tokenizer = YTEncoder.from_pretrained(model_path)
 
@@ -31,15 +23,11 @@ model = GPT2LMHeadModel.from_pretrained(model_path)
 model.to(device)
 model.eval()
 
-poetry_model = GPT2LMHeadModel.from_pretrained(model_path + '/poetry')
-poetry_model.to(device)
-poetry_model.eval()
-
 from apex import amp
-[model, poetry_model] = amp.initialize([model, poetry_model], opt_level='O2')
+[model] = amp.initialize([model], opt_level='O2')
 
 def get_sample(model, prompt, length:int, num_samples:int, allow_linebreak:bool):
-    logger.info(prompt)
+    print(prompt)
    
     filter_n = tokenizer.encode('\n')[-1:]
     filter_single = [1] + tokenizer.encode('[')[-1:] + tokenizer.encode('(')[-1:]
@@ -50,7 +38,7 @@ def get_sample(model, prompt, length:int, num_samples:int, allow_linebreak:bool)
         model=model,
         context=context_tokens,
         length=length,
-        temperature=1,
+        temperature=0.8,
         top_k=0,
         top_p=0.9,
         device=device,
@@ -67,44 +55,7 @@ def get_sample(model, prompt, length:int, num_samples:int, allow_linebreak:bool)
     reg_text = [re.match(r'[\w\W]*[\.!?]\n', item) for item in text]
     reg_text2 = [re.match(r'[\w\W]*[\.!?]', item) for item in text]
     result = [reg_item[0] if reg_item else reg_item2[0] if reg_item2 else item for reg_item, reg_item2, item in zip(reg_text, reg_text2, text)]
-    logger.info(result)
+    print(result[0])
     return result
-
-from fastapi import FastAPI
-from starlette.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Schema
-
-app = FastAPI(title="Russian GPT-2", version="0.1",)
-app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-lock = threading.RLock()
-
-class Prompt(BaseModel):
-    prompt:str = Schema(..., max_length=3000, title='Model prompt')
-    length:int = Schema(15, ge=1, le=60, title='Number of tokens generated in each sample')
-    num_samples:int = Schema(3, ge=1, le=5, title='Number of samples generated')
-    allow_linebreak:bool = Schema(False, title='Allow linebreak in a sample')
-
-@app.post("/" + model_path + "/")
-def gen_sample(prompt: Prompt):
-    with lock:
-        return {"replies": get_sample(model, prompt.prompt, prompt.length, prompt.num_samples, prompt.allow_linebreak)}
-
-class PromptPoetry(BaseModel):
-    prompt:str = Schema(..., max_length=3000, title='Model prompt')
-    length:int = Schema(15, ge=1, le=150, title='Number of tokens generated in each sample')
-
-@app.post("/gpt2_poetry/")
-def gen_sample(prompt: PromptPoetry):
-    with lock:
-        return {"replies": get_sample(poetry_model, prompt.prompt, prompt.length, 1, True)}
-
-@app.get("/health")
-def healthcheck():
-    return True
+promppt = input("what to prompt with")
+get_sample(model, promppt, 500, 1, True)

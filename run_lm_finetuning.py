@@ -286,7 +286,7 @@ def train(args, train_dataset, model, tokenizer):
     if args.lr_decay:
         scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps=warmup_steps, t_total=t_total)
     else:
-        scheduler = get_constant_schedule(optimizer, warmup_steps=warmup_steps)
+        scheduler = get_constant_schedule(optimizer)
 
     if args.fp16:
         try:
