@@ -15,7 +15,7 @@ flavor_id = device + environ.get('INSTANCE', ':0')
 from tendo import singleton
 me = singleton.SingleInstance(flavor_id=flavor_id)
 
-model_path = "../gpt3/checkpoint-" + input("checkpoint number after -")
+model_path = "../gpt3/checkpoint-"
 
 tokenizer = YTEncoder.from_pretrained(model_path)
 
@@ -27,7 +27,6 @@ from apex import amp
 [model] = amp.initialize([model], opt_level='O2')
 
 def get_sample(model, prompt, length:int, num_samples:int, allow_linebreak:bool):
-    print(prompt)
    
     filter_n = tokenizer.encode('\n')[-1:]
     filter_single = [1] + tokenizer.encode('[')[-1:] + tokenizer.encode('(')[-1:]
@@ -38,7 +37,7 @@ def get_sample(model, prompt, length:int, num_samples:int, allow_linebreak:bool)
         model=model,
         context=context_tokens,
         length=length,
-        temperature=0.8,
+        temperature=1,
         top_k=0,
         top_p=0.9,
         device=device,
@@ -55,7 +54,8 @@ def get_sample(model, prompt, length:int, num_samples:int, allow_linebreak:bool)
     reg_text = [re.match(r'[\w\W]*[\.!?]\n', item) for item in text]
     reg_text2 = [re.match(r'[\w\W]*[\.!?]', item) for item in text]
     result = [reg_item[0] if reg_item else reg_item2[0] if reg_item2 else item for reg_item, reg_item2, item in zip(reg_text, reg_text2, text)]
-    print(result[0])
+    for res in result:
+	    print(prompt+res)
     return result
-promppt = input("what to prompt with")
-get_sample(model, promppt, 500, 1, True)
+promppt = input("what to prompt with").replace("/n", "\n")
+get_sample(model, promppt, 80, 1, True)
